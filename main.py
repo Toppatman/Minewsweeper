@@ -1,42 +1,41 @@
-# MineSweeper, Grid, Cell, MineCell, NumberCell
+from abc import ABC
 import random
 
-covered, uncovered, flagged = 0, 1, 2
 
-class Cell():
+COVERED, UNCOVERED, FLAGGED = 1, 2, 3
+
+class Cell(ABC):
   def __init__(self):
-    self.state = covered
-    self.value = None # Either a number for a NumberCell or '*' for a MineCellself
+    self.value = None
+    self.state = COVERED
   
   def uncover(self):
-    if self.state == covered:
-      self.state = uncovered
-    
+    if self.state != FLAGGED:
+      self.state = UNCOVERED
+  
   def flag(self):
-    if self.state == covered:
-      self.state = flagged
+    if self.state == COVERED:
+      self.state = FLAGGED
 
   def unflag(self):
-    if self.state == flagged:
-      self.state = covered
+    if self.state == FLAGGED:
+      self.state = COVERED
 
-  # This function should return a blank character ' ' if cell is covered, an 'F' is the cell is flagged, or self.value otherwise
+  # Return ' ' if Cell is COVERED, 'F' is Cell is FLAGGED, or Cell.value if Cell is UNCOVERED
   def show(self):
-    if self.state == covered:
-      return ' '
-    if self.state == flagged:
+    if self.state == FLAGGED:
       return 'F'
-    if self.state == uncovered:
+    if self.state == UNCOVERED:
       return str(self.value)
-
-# Initialize self.value to '*'
+    if self.state == COVERED:
+      return ' '
+      
 class MineCell(Cell):
-  def __init__(self):
+  def __init__ (self):
     super().__init__()
     self.value = '*'
 
-# Initialize self.value to a number value taken as a parameter
-class NumberCell(Cell):
+class NumberedCell(Cell):
   def __init__(self, value):
     super().__init__()
     self.value = value
@@ -44,26 +43,47 @@ class NumberCell(Cell):
 class Grid():
   def __init__(self, size):
     self.size = size
-    # self.grid = [[NumberCell(0) for j in range(size)] for i in range(size)]
-    self.grid = []
-    for i in range(size):
-      self.grid.append([])
+    self.grid = [[NumberedCell(0) for j in range(size)] for i in range(size)]
+    self.numMines = size * size // 7 + 1
+    self.toUncover = size * size - self.numMines
+    
+    temp = []
+    for i in range(size):  
       for j in range(size):
-        self.grid[i].append(NumberCell(0))
-        
-    self.minePos = random.sample([(i, j) for j in range(size) for i in range(size)], size * size // 8)
+        temp.append((i, j))
+    self.minePos = random.sample(temp, self.numMines)
     self.placeMines()
 
-  def placeMines(self):
-    for pos in self.minePos:
-      row, col = pos[0], pos[1]
-      self.grid[row][col] = MineCell()
+  def placeMines(self): # Place a MineCell at each minePos position, then update the surrounding NumberCell values by +1
+    for pos in self.minePos: # [(0, 0), (0, 4), (3, 4), (4, 2), (2, 3)]
+      r = pos[0]
+      c = pos[1]
+      self.grid[r][c] = MineCell()
       for i in range(-1, 2):
         for j in range(-1, 2):
-          if 0 <= row + i < self.size and 0 <= col + j < self.size and self.grid[row + i][col + j].value != '*':
-            self.grid[row + i][col + j].value += 1
+          if 0 <= r + i < self.size and 0 <= c + j < self.size and self.grid[r+i][c+j].value != '*':
+            self.grid[r+i][c+j].value += 1
 
+  def reveal(self, row, col):
+    self.grid[row][col].uncover()
+    if self.grid[row][col].value == '*':
+      return False
+    self.toUncover -= 1
+    if self.grid[row][col].value != 0:
+      return True
+    else:
+      for i in range(-1, 2):
+        for j in range(-1, 2):
+          if 0 <= row + i < self.size and 0 <= col + j < self.size and self.grid[row + i][col + j].state == COVERED:
+            self.reveal(row + i, col + j)
+    return True
   
+  def flag(self, row, col):
+    self.grid[row][col].flag()
+    
+  def unflag(self, row, col):
+    self.grid[row][col].unflag()
+    
   def printGrid(self):
     print('    ', end='')
     for i in range(self.size):
@@ -90,27 +110,28 @@ class Grid():
 
 class MineSweeper():
   def __init__(self):
-    self.grid = Grid(10)
+    self.grid = Grid(10 )
     self.startGame()
 
   def startGame(self):
     while True:
       self.grid.printGrid()
-      move = input("Make a move: ")
+      move = input("Please make a move: ")
       row = int(move[0])
       col = int(move[2])
-      act = move[4]
-      # Reveal = R Flag = F Unflag = U
-      
-      if act == 'R':
-        # Code to uncover cell at row, col
-        pass
-      elif act == 'F':
-        # Code to flag cell at row, col
-        pass
-      elif act == 'U':
-        # Code to unflag cell at row, col
-        pass
-      
-
-MineSweeper()
+      act = move[4].lower()
+      if act == "r":
+        if not self.grid.reveal(row, col):
+          self.grid.printGrid()
+          print("You lost!*******")
+          break
+      elif act == "f":
+        self.grid.flag(row, col)
+      elif act == "u":
+        self.grid.unflag(row, col)
+      if self.grid.toUncover == 0:
+        self.grid.printGrid()
+        print("******YOU WIN!")
+        break
+        
+game = MineSweeper()
